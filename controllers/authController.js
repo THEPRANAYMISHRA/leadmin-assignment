@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const pool = require('../config/database');
 
 const register = async (req, res, next) => {
     try {
@@ -10,34 +10,57 @@ const register = async (req, res, next) => {
             return res.status(400).send('Provide all the details');
         }
 
-        const userExists = await User.findOne({ where: { userId } });
-        if (userExists) return res.status(400).send('User already exists');
+        const [userExists] = await pool.query(
+            'SELECT userId FROM Users WHERE userId = ?',
+            [userId]
+        );
+
+        if (userExists.length > 0) {
+            return res.status(400).send('User already exists');
+        }
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        const user = new User({ userId, deviceId, name, phone, availCoins: 0, password: hashedPassword });
-        await user.save();
+        const [rows] = await pool.query(
+            'INSERT INTO Users (userId, password, deviceId, name, phone, availCoins, isPrime) VALUES (?, ?, ?, ?, ?, 0, false)',
+            [userId, hashedPassword, deviceId, name, phone]
+        );
 
-        return res.send('User registered successfully');
+        return res.status(201).send('User registered successfully');
     } catch (error) {
-        return next(new Error("Internal server error"))
+        console.error(error);
+        return next(new Error("Internal server error"));
     }
 };
+
 const login = async (req, res, next) => {
     try {
         const { userId, password } = req.body;
 
-        const user = await User.findOne({ where: { userId } });
-        if (!user) return res.status(400).send('User not found');
+        if (!userId || !password) {
+            return res.status(400).send('Provide both userId and password');
+        }
 
-        const validPass = await bcrypt.compare(password, user.password);
-        if (!validPass) return res.status(400).send('Invalid password');
+        const [userExists] = await pool.query(
+            'SELECT userId, password FROM Users WHERE userId = ?',
+            [userId]
+        );
 
-        const token = jwt.sign({ userId: user.userId }, process.env.JWT_SECRET);
-        return res.header('Authorization', token).send(token);
+        if (userExists.length === 0) {
+            return res.status(400).send('User not found');
+        }
+
+        const validPass = await bcrypt.compare(password, userExists[0].password);
+        if (!validPass) {
+            return res.status(400).send('Invalid password');
+        }
+
+        const token = jwt.sign({ userId: userExists[0].userId }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        return res.header('Authorization', `Bearer ${token}`).send({ token });
     } catch (error) {
-        return next(new Error("Internal server error"))
+        console.error(error);
+        return next(new Error("Internal server error"));
     }
 };
 

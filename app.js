@@ -16,11 +16,4 @@ app.use('/api', profileRoutes);
 app.use('/api', friendRoutes);
 
 app.use(errorHandler);
-
-sequelize.sync().then(() => {
-    console.log('Database connected');
-}).catch(err => {
-    console.error('Error connecting to the database', err);
-});
-
 module.exports = app;

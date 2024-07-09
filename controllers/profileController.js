@@ -1,15 +1,18 @@
-const User = require('../models/User');
+const { pool } = require("../config/database");
 
-const getProfile = async (req, res) => {
+const getProfile = async (req, res, next) => {
     try {
         const { userId } = req.params;
-        const user = await User.findByPk(userId);
+        const [user] = await pool.query('SELECT * FROM Users WHERE userId = ?', [userId]);
 
-        if (!user) return res.status(404).send('User not found');
+        if (!user.length) {
+            return res.status(404).send('User not found');
+        }
 
-        return res.send(user);
+        return res.send(user[0]);
     } catch (error) {
-        return next(new Error("Internal server error"))
+        console.error(error);
+        return next(new Error("Internal server error"));
     }
 };
 
