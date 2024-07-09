@@ -48,7 +48,6 @@ node server.js
 
 - express
 - mysql2
-- sequelize
 - jsonwebtoken
 - bcryptjs
 - dotenv
